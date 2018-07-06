@@ -7,7 +7,11 @@ defmodule Ig.Application do
 
   def start(_type, _args) do
     # List all child processes to be supervised
+    IO.puts("Hello, welcome to this .... IG scraper.")
+
     children = [
+      Ig.Parser,
+      Ig.Scraper
       # Starts a worker by calling: Ig.Worker.start_link(arg)
       # {Ig.Worker, arg},
     ]
