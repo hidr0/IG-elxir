@@ -62,8 +62,11 @@ defmodule Ig do
   end
 
   def download(post, profile_name, timestamp) do
-    {:ok, picture_url} = Ig.Parser.parse(post)
+   case Ig.Parser.parse(post) do 
+    {:ok, picture_url} -> Ig.Downloader.download(picture_url, profile_name, timestamp)
+    {:error, ""} -> "Some error"
+    end
 
-    Ig.Downloader.download(picture_url, profile_name, timestamp)
+    
   end
 end
