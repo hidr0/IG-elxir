@@ -30,16 +30,26 @@ defmodule Ig do
     Ig.Scraper.prepare_scrape(profile)
   end
 
+  def draw() do
+    {:ok, %{profile_name: profile_name}} = Ig.Scraper.state()
+    Ig.ImageMagick.draw(profile_name)
+  end
+
   defp inner_scrape() do
-    {:ok, %{has_next_page: has_next_page}} = Ig.Scraper.state()
+    {:ok, %{has_next_page: has_next_page, is_private: is_private}} = Ig.Scraper.state()
 
     cond do
+      is_private ->
+        IO.puts("This profile is private, you cannot scrape it")
+
       has_next_page ->
         IO.puts("Scraping")
         Ig.Scraper.scrape_profile()
         inner_scrape()
 
       has_next_page == false ->
+      	IO.puts("Scraping")
+      	Ig.Scraper.scrape_profile()
         IO.puts("Finished")
     end
   end
@@ -51,9 +61,9 @@ defmodule Ig do
     inner_scrape()
   end
 
-  def download(post, profile_name) do
+  def download(post, profile_name, timestamp) do
     {:ok, picture_url} = Ig.Parser.parse(post)
 
-    Ig.Downloader.download(picture_url, profile_name)
+    Ig.Downloader.download(picture_url, profile_name, timestamp)
   end
 end

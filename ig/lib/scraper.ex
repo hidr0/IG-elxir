@@ -4,7 +4,7 @@ defmodule Ig.Scraper do
   def start_link(state \\ []) do
     GenServer.start_link(
       __MODULE__,
-      %{cookie: nil, profile_id: nil, has_next_page: false, end_cursor: nil},
+      %{cookie: nil, profile_id: nil, profile_name: "", has_next_page: false, end_cursor: nil},
       name: __MODULE__
     )
   end
@@ -28,7 +28,7 @@ defmodule Ig.Scraper do
       HTTPoison.get!("https://www.instagram.com/#{profile_name}/")
 
     case status_code do
-      200 -> get_info_from_profile(body, state)
+      200 -> get_info_from_profile(body, state |> Map.merge(%{ profile_name: profile_name }))
       _ -> {:reply, {:error, "Could not scrape profile"}, state}
     end
   end
@@ -44,20 +44,24 @@ defmodule Ig.Scraper do
         %{},
         hackney: [cookie: state[:cookie]]
       )
-
     profile =
       body
       |> JSON.decode!()
       |> Map.fetch!("data")
       |> Map.fetch!("user")
       |> Map.fetch!("edge_owner_to_timeline_media")
-
     profile
     |> Map.fetch!("edges")
     |> Enum.each(fn x ->
       short_code = x |> Map.fetch!("node") |> Map.fetch!("shortcode")
-      Ig.download(short_code, state |> Map.fetch!(:profile_id))
-      # Task.start(fn -> Ig.download(short_code ,) end)
+
+      Task.start(fn ->
+        Ig.download(
+          short_code,
+          state |> Map.fetch!(:profile_name),
+          x |> Map.fetch!("node") |> Map.fetch!("taken_at_timestamp")
+        )
+      end)
     end)
 
     temp_state = %{
@@ -76,50 +80,36 @@ defmodule Ig.Scraper do
   end
 
   defp get_info_from_profile(body, state) do
+    user =
+      body
+      |> String.split("<script type=\"text/javascript\">window._sharedData = ")
+      |> List.last()
+      |> String.split(";</script>")
+      |> List.first()
+      |> JSON.decode!()
+      |> Map.fetch!("entry_data")
+      |> Map.fetch!("ProfilePage")
+      |> List.first()
+      |> Map.fetch!("graphql")
+      |> Map.fetch!("user")
+
     temp = %{
       profile_id:
-        body
-        |> String.split("<script type=\"text/javascript\">window._sharedData = ")
-        |> List.last()
-        |> String.split(";</script>")
-        |> List.first()
-        |> JSON.decode!()
-        |> Map.fetch!("entry_data")
-        |> Map.fetch!("ProfilePage")
-        |> List.first()
-        |> Map.fetch!("graphql")
-        |> Map.fetch!("user")
+        user
         |> Map.fetch!("id"),
       has_next_page:
-        body
-        |> String.split("<script type=\"text/javascript\">window._sharedData = ")
-        |> List.last()
-        |> String.split(";</script>")
-        |> List.first()
-        |> JSON.decode!()
-        |> Map.fetch!("entry_data")
-        |> Map.fetch!("ProfilePage")
-        |> List.first()
-        |> Map.fetch!("graphql")
-        |> Map.fetch!("user")
+        user
         |> Map.fetch!("edge_owner_to_timeline_media")
         |> Map.fetch!("page_info")
         |> Map.fetch!("has_next_page"),
       end_cursor:
-        body
-        |> String.split("<script type=\"text/javascript\">window._sharedData = ")
-        |> List.last()
-        |> String.split(";</script>")
-        |> List.first()
-        |> JSON.decode!()
-        |> Map.fetch!("entry_data")
-        |> Map.fetch!("ProfilePage")
-        |> List.first()
-        |> Map.fetch!("graphql")
-        |> Map.fetch!("user")
+        user
         |> Map.fetch!("edge_owner_to_timeline_media")
         |> Map.fetch!("page_info")
-        |> Map.fetch!("end_cursor")
+        |> Map.fetch!("end_cursor"),
+      is_private:
+        user
+        |> Map.fetch!("is_private")
     }
 
     new_state = state |> Map.merge(temp)

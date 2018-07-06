@@ -1,12 +1,12 @@
 defmodule Ig.Downloader do
-  def download(picture_url, profile_name) do
-    path = "#{File.cwd!()}/pictures/#{profile_name}"
+  def download(picture_url, dir, timestamp) do
+    path = "#{File.cwd!()}/pictures/#{dir}"
     File.mkdir(path)
 
     case Download.from(
            picture_url,
            path:
-             "#{path}/#{:os.system_time(:millisecond)}_#{
+             "#{path}/#{timestamp}_#{
                picture_url
                |> String.split("/")
                |> List.last()

@@ -5,7 +5,7 @@ defmodule Ig.Parser do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  def parse(post_key), do: GenServer.call(__MODULE__, {:parse, post_key})
+  def parse(post_key), do: GenServer.call(__MODULE__, {:parse, post_key}, :infinity)
 
   def handle_call({:parse, post_key}, from, state) do
     resp = state |> Map.get(post_key)
