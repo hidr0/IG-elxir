@@ -48,8 +48,8 @@ defmodule Ig do
         inner_scrape()
 
       has_next_page == false ->
-      	IO.puts("Scraping")
-      	Ig.Scraper.scrape_profile()
+        IO.puts("Scraping")
+        Ig.Scraper.scrape_profile()
         IO.puts("Finished")
     end
   end
@@ -57,16 +57,14 @@ defmodule Ig do
   def scrape(profile) do
     IO.puts("Preparing Profile")
     Ig.Scraper.prepare_scrape(profile)
-
+    Ig.Scraper.initial_scrape()
     inner_scrape()
   end
 
   def download(post, profile_name, timestamp) do
-   case Ig.Parser.parse(post) do 
-    {:ok, picture_url} -> Ig.Downloader.download(picture_url, profile_name, timestamp)
-    {:error, ""} -> "Some error"
+    case Ig.Parser.parse(post) do
+      {:ok, picture_url} -> Ig.Downloader.download(picture_url, profile_name, timestamp)
+      {:error, ""} -> "Some error"
     end
-
-    
   end
 end

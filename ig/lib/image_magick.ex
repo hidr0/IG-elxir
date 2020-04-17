@@ -2,7 +2,8 @@ import Mogrify
 
 defmodule Ig.ImageMagick do
   def draw(profile_folder) do
-    files = File.ls!("pictures/#{profile_folder}") |> Enum.filter(fn x -> x =~ "jpg" end)
+    files =
+      File.ls!("pictures/#{profile_folder}") |> Enum.filter(fn x -> x =~ "jpg" end) |> Enum.sort()
 
     count = files |> Enum.count() |> IO.inspect()
 

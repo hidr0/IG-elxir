@@ -20,6 +20,55 @@ defmodule Ig.Scraper do
     {:reply, {:ok, new_state}, new_state}
   end
 
+  def initial_scrape(), do: GenServer.call(__MODULE__, {:initial_scrape})
+
+  def handle_call({:initial_scrape}, from, state) do
+    %HTTPoison.Response{body: body, status_code: status_code} =
+      HTTPoison.get!("https://www.instagram.com/#{state |> Map.fetch!(:profile_name)}/")
+
+    profile =
+      body
+      |> String.split("<script type=\"text/javascript\">window._sharedData = ")
+      |> List.last()
+      |> String.split(";</script>")
+      |> List.first()
+      |> JSON.decode!()
+      |> Map.fetch!("entry_data")
+      |> Map.fetch!("ProfilePage")
+      |> List.first()
+      |> Map.fetch!("graphql")
+      |> Map.fetch!("user")
+      |> Map.fetch!("edge_owner_to_timeline_media")
+
+    profile
+    |> Map.fetch!("edges")
+    |> Enum.each(fn x ->
+      short_code = x |> Map.fetch!("node") |> Map.fetch!("shortcode")
+
+      Task.start(fn ->
+        Ig.download(
+          short_code,
+          state |> Map.fetch!(:profile_name),
+          x |> Map.fetch!("node") |> Map.fetch!("taken_at_timestamp")
+        )
+      end)
+    end)
+
+    temp_state = %{
+      has_next_page:
+        profile
+        |> Map.fetch!("page_info")
+        |> Map.fetch!("has_next_page"),
+      end_cursor:
+        profile
+        |> Map.fetch!("page_info")
+        |> Map.fetch!("end_cursor")
+    }
+
+    new_state = Map.merge(state, temp_state)
+    {:reply, {:ok, new_state}, new_state}
+  end
+
   def prepare_scrape(profile_name),
     do: GenServer.call(__MODULE__, {:prepare_scrape, profile_name})
 
@@ -28,7 +77,7 @@ defmodule Ig.Scraper do
       HTTPoison.get!("https://www.instagram.com/#{profile_name}/")
 
     case status_code do
-      200 -> get_info_from_profile(body, state |> Map.merge(%{ profile_name: profile_name }))
+      200 -> get_info_from_profile(body, state |> Map.merge(%{profile_name: profile_name}))
       _ -> {:reply, {:error, "Could not scrape profile"}, state}
     end
   end
@@ -44,12 +93,14 @@ defmodule Ig.Scraper do
         %{},
         hackney: [cookie: state[:cookie]]
       )
+
     profile =
       body
       |> JSON.decode!()
       |> Map.fetch!("data")
       |> Map.fetch!("user")
       |> Map.fetch!("edge_owner_to_timeline_media")
+
     profile
     |> Map.fetch!("edges")
     |> Enum.each(fn x ->
